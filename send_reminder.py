@@ -23,20 +23,22 @@ if entries:
     total_h = sum(float(e["hours"]) if e["hours"] else 0 for e in entries)
     lines = [f"10pm check \u2014 {today_str}"]
     lines.append("")
-    lines.append(f"You've logged {len(entries)} session(s) today ({total_h:.1f}h total).")
+    lines.append(f"Good, you logged {len(entries)} session(s) today ({total_h:.1f}h total). Keep going.")
     lines.append("")
     for e in entries:
         lines.append(f"  \u2022 {e['category']} \u2014 {e['activity']} ({e['hours']}h)")
     lines.append("")
-    lines.append("Summary will be sent to WhatsApp at 10:50pm.")
-    subject = f"\u23f0 Study check-in \u2014 {len(entries)} session(s) today"
+    lines.append("Summary goes to WhatsApp at 10:50pm.")
+    subject = f"\u2705 Study check-in \u2014 {len(entries)} session(s)"
 else:
     lines = [f"10pm check \u2014 {today_str}"]
     lines.append("")
-    lines.append("No study entries logged yet today.")
+    lines.append("WHERE THE HELL IS YOUR WORK? DO WORK.")
     lines.append("")
-    lines.append("Log your entries by 10:50pm or an alert will be sent.")
-    subject = f"\u23f0 Study check-in \u2014 nothing logged yet"
+    lines.append("You have until 10:50pm to log your study entries. If nothing is logged by then, another alert will be sent and your streak will be broken.")
+    lines.append("")
+    lines.append("Stop procrastinating and get to it.")
+    subject = f"\u26a0\ufe0f NO STUDY LOGGED \u2014 WHERE IS YOUR WORK"
 
 try:
     send_email(subject, "\n".join(lines), config)
