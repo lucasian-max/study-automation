@@ -1,0 +1,8 @@
+token.json
+client_secret.json
+whatsapp-session/
+log.txt
+error.log
+__pycache__/
+*.pyc
+.DS_Store

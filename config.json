@@ -1,0 +1,28 @@
+{
+  "google_sheets": {
+    "credentials_file": "client_secret.json",
+    "token_file": "token.json",
+    "spreadsheet_id": "1KuXnrxfxLLbfBUM3hTimn2yNEiV6jlxfsWx6h1lssbE",
+    "date_column": 0,
+    "category_column": 1,
+    "activity_column": 2,
+    "hours_column": 3,
+    "focus_column": 4,
+    "notes_column": 5,
+    "header_row_count": 1
+  },
+  "whatsapp": {
+    "group_name": "Sreeja and mridul",
+    "session_dir": "./whatsapp-session"
+  },
+  "email": {
+    "sender": "mridul.vj2010@gmail.com",
+    "app_password": "xkki hvzi cirw zxdz",
+    "recipient": "mridul.vj2010@gmail.com"
+  },
+  "schedule": {
+    "check_time": "20:00",
+    "send_time": "21:00"
+  },
+  "date_format": "dd/mm/yyyy"
+}

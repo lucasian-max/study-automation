@@ -1,0 +1,42 @@
+name: Daily Study Summary
+
+on:
+  schedule:
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+          pip install playwright
+          playwright install chromium
+
+      - name: Restore auth files
+        run: |
+          echo "${{ secrets.TOKEN_JSON }}" | base64 -d > token.json
+          mkdir -p whatsapp-session
+          echo "${{ secrets.WHATSAPP_STATE }}" | base64 -d > whatsapp-session/state.json
+
+      - name: Run study automation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 main.py
+
+      - name: Commit streak data
+        run: |
+          git config user.name "study-bot"
+          git config user.email "bot@localhost"
+          git add streak.json
+          git diff --staged --quiet || git commit -m "Update streak data"
+          git push
