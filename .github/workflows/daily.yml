@@ -24,13 +24,17 @@ jobs:
 
       - name: Restore auth files
         run: |
-          echo "${{ secrets.TOKEN_JSON }}" | base64 -d > token.json
+          if [ -n "${{ secrets.TOKEN_JSON }}" ]; then
+            echo "${{ secrets.TOKEN_JSON }}" | base64 -d > token.json
+          fi
           mkdir -p whatsapp-session
-          echo "${{ secrets.WHATSAPP_STATE }}" | base64 -d > whatsapp-session/state.json
+          if [ -n "${{ secrets.WHATSAPP_STATE }}" ]; then
+            echo "${{ secrets.WHATSAPP_STATE }}" | base64 -d > whatsapp-session/state.json
+          fi
 
       - name: Run study automation
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: python3 main.py
 
       - name: Commit streak data
@@ -38,5 +42,5 @@ jobs:
           git config user.name "study-bot"
           git config user.email "bot@localhost"
           git add streak.json
-          git diff --staged --quiet || git commit -m "Update streak data"
+          git diff --staged --quiet || git commit -m "Update streak data [skip ci]"
           git push

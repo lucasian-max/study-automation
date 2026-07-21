@@ -550,6 +550,7 @@ def send_email_alert(config):
 def send_whatsapp(message, config):
     import asyncio
     from playwright.async_api import async_playwright
+    IN_CI = os.environ.get("CI") == "true"
 
     async def _send():
         wp = config["whatsapp"]
@@ -558,8 +559,12 @@ def send_whatsapp(message, config):
         session_dir.mkdir(exist_ok=True)
         state_file = session_dir / "state.json"
 
+        if not state_file.exists() and IN_CI:
+            print("WhatsApp session not found and running in CI — skipping WhatsApp, will send email instead")
+            raise RuntimeError("NO_SESSION_IN_CI")
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
+            browser = await p.chromium.launch(headless=IN_CI, args=["--no-sandbox"] if IN_CI else [])
             context_kwargs = {}
             if state_file.exists():
                 context_kwargs["storage_state"] = str(state_file)
