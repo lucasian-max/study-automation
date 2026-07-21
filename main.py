@@ -235,6 +235,11 @@ def analyze_notes(entries):
         for e in entries if e.get("notes", "").strip()
     )
 
+    # If notes are too short, skip analysis to avoid hallucination
+    words = notes_text.split()
+    if len(words) < 10:
+        return "", ""
+
     prompt = f"From my notes, what went well and what to improve? One sentence each.\n\n{notes_text}"
 
     print("\n--- Analysis prompt ---")
@@ -242,7 +247,7 @@ def analyze_notes(entries):
     print("---")
 
     raw = _llm(prompt)
-    print("Ollama:", raw)
+    print("LLM response:", raw)
 
     went_well = ""
     improve = ""
@@ -568,17 +573,28 @@ def send_whatsapp(message, config):
             raise RuntimeError("NO_SESSION_IN_CI")
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=IN_CI, args=["--no-sandbox"] if IN_CI else [])
-            context_kwargs = {}
+            browser = await p.chromium.launch(
+                headless=False,
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"] if IN_CI else []
+            )
+            context_kwargs = {
+                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            }
             if state_file.exists():
                 context_kwargs["storage_state"] = str(state_file)
 
             context = await browser.new_context(**context_kwargs)
             page = await context.new_page()
 
+            # Stealth: hide automation
+            await page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            """)
+
             print("Opening WhatsApp Web...")
-            await page.goto("https://web.whatsapp.com")
-            await page.wait_for_load_state("domcontentloaded")
+            await page.goto("https://web.whatsapp.com", wait_until="domcontentloaded")
 
             if not state_file.exists():
                 print("\nWhatsApp Web is open in your browser.")
