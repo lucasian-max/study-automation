@@ -1,6 +1,7 @@
 token.json
 client_secret.json
 whatsapp-session/
+whatsapp-profile/
 log.txt
 error.log
 __pycache__/

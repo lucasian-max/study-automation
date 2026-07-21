@@ -557,51 +557,57 @@ def send_email_alert(config):
 
 
 def send_whatsapp(message, config):
-    import asyncio, sys
+    import asyncio, sys, tarfile
     from playwright.async_api import async_playwright
     IN_CI = os.environ.get("CI") == "true"
 
     async def _send():
         wp = config["whatsapp"]
         group_name = wp["group_name"]
-        session_dir = Path(wp["session_dir"])
-        session_dir.mkdir(exist_ok=True)
-        state_file = session_dir / "state.json"
+        profile_archive = Path(__file__).parent / "whatsapp-profile.tar.gz"
+        profile_dir = Path(__file__).parent / "whatsapp-profile"
 
-        if not state_file.exists() and IN_CI:
-            print("WhatsApp session not found and running in CI — skipping WhatsApp, will send email instead")
-            raise RuntimeError("NO_SESSION_IN_CI")
+        if not profile_dir.exists() and profile_archive.exists():
+            print("Extracting profile archive...")
+            import tarfile
+            with tarfile.open(profile_archive, "r:gz") as tar:
+                tar.extractall(path=Path(__file__).parent)
+
+        if not profile_dir.exists():
+            if IN_CI:
+                print("WhatsApp profile not found in CI — skipping WhatsApp")
+                raise RuntimeError("NO_PROFILE_IN_CI")
+            print("WhatsApp profile not found. Run scripts/save_profile.py first.")
+            raise RuntimeError("NO_PROFILE")
 
         async with async_playwright() as p:
             if IN_CI:
-                browser = await p.chromium.launch(
+                context = await p.chromium.launch_persistent_context(
+                    str(profile_dir),
                     headless=False,
                     args=[
                         "--no-sandbox",
                         "--disable-blink-features=AutomationControlled",
                         "--disable-gpu",
                         "--window-size=1280,720",
-                    ]
+                    ],
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                    viewport={"width": 1280, "height": 720},
                 )
             elif sys.platform == "darwin":
-                browser = await p.chromium.launch(
+                context = await p.chromium.launch_persistent_context(
+                    str(profile_dir),
                     headless=False, channel="chrome",
-                    args=["--disable-blink-features=AutomationControlled"]
+                    args=["--disable-blink-features=AutomationControlled"],
                 )
             else:
-                browser = await p.chromium.launch(headless=False)
+                context = await p.chromium.launch_persistent_context(
+                    str(profile_dir), headless=False
+                )
 
-            context_kwargs = {
-                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                "viewport": {"width": 1280, "height": 720},
-            } if IN_CI else {}
-            if state_file.exists():
-                context_kwargs["storage_state"] = str(state_file)
+            page = context.pages[0]
 
-            context = await browser.new_context(**context_kwargs)
-            page = await context.new_page()
-
-            # Stealth: hide automation
+            # Stealth
             await page.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
@@ -611,14 +617,6 @@ def send_whatsapp(message, config):
 
             print("Opening WhatsApp Web...")
             await page.goto("https://web.whatsapp.com", wait_until="load")
-
-            if not state_file.exists():
-                print("\nWhatsApp Web is open in your browser.")
-                print("Scan the QR code with your phone, then press ENTER here.")
-                input("Press ENTER after scanning...")
-                await page.wait_for_timeout(3000)
-                await context.storage_state(path=str(state_file))
-                print("Session saved.\n")
 
             print("Waiting for chat to load...")
             try:
@@ -652,7 +650,7 @@ def send_whatsapp(message, config):
             await page.wait_for_timeout(3000)
 
             print("Message sent!")
-            await browser.close()
+            await context.close()
 
     def _run():
         asyncio.run(_send())
