@@ -557,7 +557,7 @@ def send_email_alert(config):
 
 
 def send_whatsapp(message, config):
-    import asyncio
+    import asyncio, sys
     from playwright.async_api import async_playwright
     IN_CI = os.environ.get("CI") == "true"
 
@@ -573,13 +573,19 @@ def send_whatsapp(message, config):
             raise RuntimeError("NO_SESSION_IN_CI")
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=False,
-                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"] if IN_CI else []
-            )
-            context_kwargs = {
-                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            }
+            browser_args = ["--no-sandbox", "--disable-blink-features=AutomationControlled"] if IN_CI else []
+            if sys.platform == "darwin" and not IN_CI:
+                browser = await p.chromium.launch(
+                    headless=False,
+                    channel="chrome",
+                    args=browser_args
+                )
+            else:
+                browser = await p.chromium.launch(
+                    headless=IN_CI,
+                    args=browser_args
+                )
+            context_kwargs = {}
             if state_file.exists():
                 context_kwargs["storage_state"] = str(state_file)
 
