@@ -1,15 +1,15 @@
-name: Daily Study Summary
+name: Study Reminder
 
 on:
   schedule:
-    - cron: '20 17 * * *'
+    - cron: '30 16 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  run:
+  remind:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,13 +37,5 @@ jobs:
             echo "${{ secrets.WHATSAPP_STATE }}" | base64 -d > whatsapp-session/state.json
           fi
 
-      - name: Run study automation
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: xvfb-run python3 main.py
-
-      - name: Commit streak data
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update streak data [skip ci]"
-          file_pattern: streak.json
+      - name: Send reminder
+        run: xvfb-run python3 send_reminder.py
