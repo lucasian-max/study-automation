@@ -573,19 +573,19 @@ def send_whatsapp(message, config):
             raise RuntimeError("NO_SESSION_IN_CI")
 
         async with async_playwright() as p:
-            browser_args = ["--no-sandbox", "--disable-blink-features=AutomationControlled"] if IN_CI else []
             if sys.platform == "darwin" and not IN_CI:
                 browser = await p.chromium.launch(
-                    headless=False,
-                    channel="chrome",
-                    args=browser_args
+                    headless=False, channel="chrome",
+                    args=["--disable-blink-features=AutomationControlled"]
                 )
+            elif IN_CI:
+                browser = await p.firefox.launch(headless=False)
             else:
-                browser = await p.chromium.launch(
-                    headless=IN_CI,
-                    args=browser_args
-                )
-            context_kwargs = {}
+                browser = await p.chromium.launch(headless=False)
+
+            context_kwargs = {
+                "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+            } if IN_CI else {}
             if state_file.exists():
                 context_kwargs["storage_state"] = str(state_file)
 
@@ -643,7 +643,8 @@ def send_whatsapp(message, config):
     def _run():
         asyncio.run(_send())
 
-    retry_fn(_run, max_attempts=5, base_delay=30, label="WhatsApp")
+    n = 2 if IN_CI else 5
+    retry_fn(_run, max_attempts=n, base_delay=30, label="WhatsApp")
 
 
 def main():
