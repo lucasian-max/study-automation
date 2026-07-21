@@ -121,36 +121,40 @@ def get_todays_entries(service, config):
 
 
 def _llm(prompt, timeout=60):
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    version = os.environ.get("GITHUB_TOKEN_VERSION", "2026-01-30")
+    import urllib.request, ssl
+    import json as _json
+
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+
+    token = os.environ.get("OPENROUTER_API_KEY")
     if token:
-        import urllib.request
-        import json as _json
         body = _json.dumps({
-            "model": "gpt-4o-mini",
+            "model": "openai/gpt-4o-mini",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
             "max_tokens": 300,
         }).encode()
         req = urllib.request.Request(
-            "https://models.github.ai/inference",
+            "https://openrouter.ai/api/v1/chat/completions",
             data=body,
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {token}",
-                "Openai-Beta": "assistants=v1",
+                "HTTP-Referer": "https://github.com/lucasian-max/study-automation",
             }
         )
         try:
-            resp = urllib.request.urlopen(req, timeout=timeout)
+            resp = urllib.request.urlopen(req, context=ctx, timeout=timeout)
             data = _json.loads(resp.read())
             return data["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            print(f"GitHub Models error: {e}")
+            print(f"OpenRouter error: {e}")
 
     # Fallback to local Ollama
-    import urllib.request
-    import json as _json
     body = _json.dumps({"model": "llama3.2:3b", "prompt": prompt, "stream": False}).encode()
     req = urllib.request.Request("http://localhost:11434/api/generate", data=body, headers={"Content-Type": "application/json"})
     try:

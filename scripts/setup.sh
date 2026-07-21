@@ -1,37 +1,54 @@
 #!/bin/bash
-# Run this script locally to generate the GitHub secrets
-# Usage: bash scripts/setup.sh
-
 set -e
 
-echo "=== Step 1: Create GitHub PAT ==="
-echo "Go to: https://github.com/settings/tokens"
-echo "Create a classic token with scopes: repo, models"
-echo "Copy the token value."
+echo "=== Step 1: Get an OpenRouter API key ==="
+echo "1. Go to https://openrouter.ai/keys"
+echo "2. Sign in with GitHub (free, no credit card)"
+echo "3. Copy your API key (sk-or-...)"
 echo ""
 
-read -p "Paste your GitHub PAT (classic, with models scope): " GH_PAT
+read -p "Paste your OpenRouter API key: " OR_KEY
 
 echo ""
 echo "=== Step 2: Encode auth files ==="
 
-TOKEN_B64=$(base64 -i token.json 2>/dev/null || base64 < token.json)
-echo "Token JSON encoded ✓"
+if [ -f token.json ]; then
+  TOKEN_B64=$(base64 -i token.json 2>/dev/null || base64 < token.json)
+  echo "token.json encoded ✓"
+else
+  echo "Error: token.json not found. Run 'python3 main.py' locally first."
+  exit 1
+fi
 
 if [ -f whatsapp-session/state.json ]; then
   WA_B64=$(base64 -i whatsapp-session/state.json 2>/dev/null || base64 < whatsapp-session/state.json)
-  echo "WhatsApp session encoded ✓"
+  echo "whatsapp-session/state.json encoded ✓"
 else
-  echo "Warning: whatsapp-session/state.json not found. Run main.py locally first to generate it."
+  echo "Warning: whatsapp-session/state.json not found — WhatsApp will be skipped in CI."
+  echo "Run 'python3 main.py' locally and scan the QR code to generate it."
   WA_B64=""
 fi
 
 echo ""
 echo "=== Step 3: Set GitHub secrets ==="
-echo "Run these commands:"
+echo "Running: gh secret set ..."
 echo ""
-echo "echo \"$TOKEN_B64\" | gh secret set TOKEN_JSON --repo lucasian-max/study-automation"
-echo "gh secret set GH_PAT --repo lucasian-max/study-automation --body \"$GH_PAT\""
+
+gh secret set OPENROUTER_API_KEY --repo lucasian-max/study-automation --body "$OR_KEY"
+echo "OPENROUTER_API_KEY set ✓"
+
+echo "$TOKEN_B64" | gh secret set TOKEN_JSON --repo lucasian-max/study-automation
+echo "TOKEN_JSON set ✓"
+
 if [ -n "$WA_B64" ]; then
-  echo "echo \"$WA_B64\" | gh secret set WHATSAPP_STATE --repo lucasian-max/study-automation"
+  echo "$WA_B64" | gh secret set WHATSAPP_STATE --repo lucasian-max/study-automation
+  echo "WHATSAPP_STATE set ✓"
 fi
+
+echo ""
+echo "=== All secrets set! ==="
+echo "The workflow will run daily at 11pm IST (17:30 UTC)."
+echo "You can also trigger it manually at:"
+echo "  https://github.com/lucasian-max/study-automation/actions"
+echo ""
+echo "To test immediately, run: gh workflow run daily.yml --repo lucasian-max/study-automation"
