@@ -133,7 +133,7 @@ def _llm(prompt, timeout=60):
     token = os.environ.get("OPENROUTER_API_KEY")
     if token:
         body = _json.dumps({
-            "model": "openai/gpt-4o-mini",
+            "model": "openai/gpt-4o",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
             "max_tokens": 300,
@@ -166,27 +166,53 @@ def _llm(prompt, timeout=60):
         return ""
 
 
+ABBREV_RE = re.compile(r'[A-Z][a-z]{1,}\.(?: [A-Z][a-zA-Z]*)*')
+
+def _protect_abbrevs(text):
+    seen = {}
+    def _repl(m):
+        orig = m.group(0)
+        if orig not in seen:
+            seen[orig] = f"q7x{len(seen)}k2"
+        return seen[orig]
+    return ABBREV_RE.sub(_repl, text), seen
+
+def _restore_abbrevs(text, mapping):
+    for orig, placeholder in mapping.items():
+        text = text.replace(placeholder, orig)
+    return text
+
+def _extract_actions(note):
+    import re as _re
+    # Protect abbreviations with periods before splitting sentences
+    protected, mapping = _protect_abbrevs(note)
+    sents = _re.split(r'(?<=[.!?])\s+', protected)
+    sents = [_restore_abbrevs(s, mapping) for s in sents]
+
+    feeling_re = _re.compile(
+        r'\b(feel|felt|feeling|my focus|my concentration|scared|scary|'
+        r'tedious|boring|hopefully|fun|wasted|will\b(?!\s+be)|stupid|'
+        r'need to make sure|need to not let|get my act)\b',
+        re.IGNORECASE
+    )
+
+    keep = []
+    for s in sents:
+        s = s.strip()
+        if not s or s in ('I', 'I.'):
+            continue
+        if feeling_re.search(s):
+            continue
+        keep.append(s)
+
+    if not keep:
+        return None
+    result = " ".join(k.strip('.!?') for k in keep) + "."
+    return result[0].upper() + result[1:] if result and result[0].islower() else result
+
 def summarize_notes(entries):
     if not entries:
         return []
-
-    EMOTIONAL = re.compile(r'(?i)(\bconcentrat\w*|\bconfiden\w*|\banxi\w*|\bnervous\w*|\bscared\w*|\bfeel(?:ing|ings)?\b|\bemotion\w*|\bworry\w*|\bstress\w*|\bmotivat\w*|\bprogress\w*|\bsharpening\b|\bconcern\w*|\bsurpris\w*|\buneasy\b|\bspook\w*|\bunsettl\w*|\bfrustrat\w*|\bdoubt\w*|\boverwhelm\w*|\bdisappoint\w*)')
-    STOPWORDS = {'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it', 'they', 'them',
-                 'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-                 'by', 'from', 'up', 'about', 'into', 'over', 'after', 'before', 'between', 'under',
-                 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
-                 'do', 'does', 'did', 'doing', 'will', 'would', 'can', 'could', 'shall', 'should',
-                 'may', 'might', 'must', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these',
-                 'those', 'some', 'any', 'no', 'not', 'none', 'each', 'every', 'all', 'both',
-                 'few', 'several', 'many', 'much', 'more', 'most', 'little', 'less', 'least',
-                 'here', 'there', 'then', 'than', 'too', 'very', 'just', 'also', 'only', 'now',
-                 'today', 'tomorrow', 'yesterday', 'get', 'got', 'gotten', 'make', 'made',
-                 'take', 'took', 'go', 'went', 'gone', 'come', 'came', 'give', 'gave', 'look',
-                 'see', 'saw', 'know', 'knew', 'think', 'thought', 'want', 'say', 'said', 'tell',
-                 'told', 'ask', 'asked', 'try', 'tried', 'let', 'put', 'set', 'use', 'used',
-                 'like', 'just', 'even', 'still', 'well', 'back', 'really', 'actually', 'also',
-                 'next', 'first', 'last', 'while', 'during', 'since', 'because', 'if', 'when',
-                 'where', 'how', 'what', 'which', 'who', 'whom', 'whose', 'why'}
 
     results = []
     for e in entries:
@@ -196,32 +222,36 @@ def summarize_notes(entries):
             results.append(note)
             continue
 
-        emotional_count = len(EMOTIONAL.findall(note))
-        if emotional_count >= 2 or (len(words) > 0 and emotional_count / len(words) > 0.2):
-            results.append(e["activity"])
-            continue
-
-        prompt = f"Fix grammar, reply with only the corrected version: {note}"
-        raw = _llm(prompt)
-        cleaned = raw.strip("* ").strip("- ").strip().strip('"').strip("'")
-        cleaned = re.sub(r'^[^:]+:\s*', '', cleaned).strip()
-        # Drop any analysis/explanation the model adds
-        parts = re.split(r'\n\s*\n', cleaned)
-        cleaned = parts[0].strip()
-        if not cleaned or len(cleaned) < 5:
-            results.append(e["activity"])
-            continue
-
-        orig_keywords = {w.lower().strip(".,!?;:'\"") for w in words
-                         if len(w) >= 5 and w.lower() not in STOPWORDS and not EMOTIONAL.search(w)}
-        clean_keywords = {w.lower().strip(".,!?;:'\"") for w in cleaned.split()
-                          if len(w) >= 5 and w.lower() not in STOPWORDS and not EMOTIONAL.search(w)}
-        if orig_keywords and clean_keywords:
-            if not (orig_keywords & clean_keywords):
-                results.append(e["activity"])
-                continue
-
-        results.append(cleaned)
+        actions = _extract_actions(note)
+        if actions is not None:
+            safe, ab_map = _protect_abbrevs(actions)
+            prompt = (
+                f"Fix the grammar of this sentence. Do not add, remove, or change any information. "
+                f"Keep abbreviations and numbers as-is. Return only the corrected sentence:\n\n{safe}"
+            )
+            raw = _llm(prompt)
+            cleaned = raw.strip('"').strip("'").strip()
+            # Strip common prefixes the model adds
+            for p in ('Here is the revised sentence:', 'Here is the corrected sentence:', 'Corrected:', 'Revised:'):
+                if cleaned.lower().startswith(p.lower()):
+                    cleaned = cleaned[len(p):].strip()
+            if cleaned and len(cleaned) >= 5:
+                results.append(_restore_abbrevs(cleaned, ab_map))
+            else:
+                results.append(actions)
+        else:
+            safe_note, ab_map = _protect_abbrevs(note)
+            prompt = (
+                f"Read this study note and answer: what was accomplished today? "
+                f"Be specific using only the note. 1 short first-person sentence. "
+                f"No feelings, no commentary, no emojis:\n\n{safe_note}"
+            )
+            raw = _llm(prompt)
+            cleaned = raw.strip('"').strip("'").strip()
+            for p in ('Here is the revised sentence:', 'Here is the corrected sentence:', 'Corrected:', 'Revised:'):
+                if cleaned.lower().startswith(p.lower()):
+                    cleaned = cleaned[len(p):].strip()
+            results.append(_restore_abbrevs(cleaned, ab_map) if cleaned and len(cleaned) >= 5 else note)
 
     return results
 
@@ -475,7 +505,7 @@ def format_whatsapp_message(entries, summaries, tone_line):
     return "\n".join(lines)
 
 
-def format_email_body(entries, summaries, tone_line, streak_data, went_well, improve):
+def format_email_body(entries, summaries, tone_line, streak_data):
     total_hours = sum(_fval(e["hours"]) for e in entries)
     avg_focus = sum(_fval(e["focus"]) for e in entries) / max(len(entries), 1)
     today_str = date.today().strftime('%d %b %Y')
@@ -501,14 +531,6 @@ def format_email_body(entries, summaries, tone_line, streak_data, went_well, imp
             parts.append(f"     Summary: {s}")
         if full_note:
             parts.append(f"     Note: {full_note}")
-        parts.append("")
-
-    if went_well or improve:
-        parts.append("Reflection")
-        if went_well:
-            parts.append(f"  What went well: {went_well}")
-        if improve:
-            parts.append(f"  To improve: {improve}")
         parts.append("")
 
     if weekly:
@@ -608,7 +630,6 @@ def main():
         print(f"Found {len(entries)} entries for today")
 
         summaries = summarize_notes(entries)
-        went_well, improve = analyze_notes(entries)
         streak_data = update_streak(entries)
         tone_line = get_tone(entries, streak_data)
 
@@ -630,7 +651,7 @@ def main():
             except Exception as e2:
                 print(f"Even critical email failed: {e2}")
 
-        email_body = format_email_body(entries, summaries, tone_line, streak_data, went_well, improve)
+        email_body = format_email_body(entries, summaries, tone_line, streak_data)
         print("\n--- Email Body ---")
         print(email_body)
         print("---\n")
