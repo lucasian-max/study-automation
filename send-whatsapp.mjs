@@ -18,7 +18,7 @@ async function send() {
   sock.ev.on('creds.update', saveCreds);
 
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Connection timeout')), 30000);
+    const timer = setTimeout(() => reject(new Error('Connection timeout')), 15000);
     sock.ev.on('connection.update', async (update) => {
       const { connection } = update;
       if (connection === 'open') {

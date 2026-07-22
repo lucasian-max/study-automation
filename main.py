@@ -15,7 +15,7 @@ from googleapiclient.errors import HttpError
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 STREAK_FILE = Path(__file__).parent / "streak.json"
 
-def retry_fn(fn, max_attempts=5, base_delay=30, label=""):
+def retry_fn(fn, max_attempts=3, base_delay=5, label=""):
     import time
     for attempt in range(1, max_attempts + 1):
         try:
@@ -121,7 +121,7 @@ def get_todays_entries(service, config):
     return entries
 
 
-def _llm(prompt, timeout=60):
+def _llm(prompt, timeout=20):
     import urllib.request, ssl
     import json as _json
 
@@ -571,7 +571,7 @@ def send_whatsapp(message, config):
         else:
             raise RuntimeError(f"node exited {result.returncode}: {stdout} {stderr}")
 
-    retry_fn(_do, max_attempts=3, base_delay=10, label="WhatsApp Baileys")
+    retry_fn(_do, max_attempts=2, base_delay=3, label="WhatsApp Baileys")
 
 
 def _send_reminder(config, service):
@@ -650,12 +650,9 @@ def main():
             wa_ok = True
         except Exception as e:
             print(f"WhatsApp failed after retries: {e}")
-            try:
-                alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}"
-                send_email(f"CRITICAL: WhatsApp failed \u2014 {date.today().strftime('%d %b %Y')}", alert, config)
-                print("Critical alert email sent.")
-            except Exception as e2:
-                print(f"Even critical email failed: {e2}")
+            alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}"
+            send_email(f"CRITICAL: WhatsApp failed \u2014 {date.today().strftime('%d %b %Y')}", alert, config)
+            print("Critical alert email sent.")
 
         email_body = format_email_body(entries, summaries, tone_line, streak_data)
         print("\n--- Email Body ---")
