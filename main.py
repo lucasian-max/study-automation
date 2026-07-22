@@ -219,7 +219,7 @@ def summarize_notes(entries):
     for e in entries:
         note = e["notes"].strip() if e["notes"] else ""
         words = note.split()
-        if len(words) < 5:
+        if len(words) < 10:
             results.append(note)
             continue
 
@@ -298,11 +298,12 @@ def update_streak(entries):
     total_hours = sum(_fval(e["hours"]) for e in entries)
     avg_focus = sum(_fval(e["focus"]) for e in entries) / max(len(entries), 1)
 
-    data["history"].append({
-        "date": today_str,
-        "total_hours": round(total_hours, 1),
-        "avg_focus": round(avg_focus, 1),
-    })
+    existing = [d for d in data["history"] if d["date"] == today_str]
+    entry = {"date": today_str, "total_hours": round(total_hours, 1), "avg_focus": round(avg_focus, 1)}
+    if existing:
+        existing[0].update(entry)
+    else:
+        data["history"].append(entry)
 
     if len(data["history"]) > 60:
         data["history"] = data["history"][-60:]
@@ -511,6 +512,7 @@ def send_email(subject, body, config):
     from email.mime.text import MIMEText
 
     email_cfg = config["email"]
+    password = os.environ.get("GMAIL_APP_PASSWORD") or email_cfg.get("app_password", "")
 
     def _do():
         msg = MIMEText(body)
@@ -518,7 +520,7 @@ def send_email(subject, body, config):
         msg["From"] = email_cfg["sender"]
         msg["To"] = email_cfg["recipient"]
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(email_cfg["sender"], email_cfg["app_password"])
+            server.login(email_cfg["sender"], password)
             server.send_message(msg)
         print(f"Email sent to {email_cfg['recipient']}")
 
@@ -582,7 +584,7 @@ def _send_reminder(config, service):
     today_str = date.today().strftime('%d %b %Y')
 
     if entries:
-        total_h = sum(float(e["hours"]) if e["hours"] else 0 for e in entries)
+        total_h = sum(_fval(e["hours"]) for e in entries)
         lines = [
             f"10pm check \u2014 {today_str}",
             "",

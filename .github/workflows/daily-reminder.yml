@@ -28,4 +28,6 @@ jobs:
           fi
 
       - name: Send reminder
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python3 main.py --reminder

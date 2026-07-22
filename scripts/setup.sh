@@ -31,6 +31,15 @@ echo "OPENROUTER_API_KEY set ✓"
 echo "$TOKEN_B64" | gh secret set TOKEN_JSON --repo lucasian-max/study-automation
 echo "TOKEN_JSON set ✓"
 
+read -p "Paste your Gmail app password (or press Enter to skip): " GMAIL_PW
+if [ -n "$GMAIL_PW" ]; then
+  echo "$GMAIL_PW" | gh secret set GMAIL_APP_PASSWORD --repo lucasian-max/study-automation
+  echo "GMAIL_APP_PASSWORD set ✓"
+else
+  echo "Warning: GMAIL_APP_PASSWORD not set — email delivery will fail in CI."
+  echo "Generate one at https://myaccount.google.com/apppasswords"
+fi
+
 echo ""
 echo "=== All secrets set! ==="
 echo "The workflow will run daily at 11pm IST (17:30 UTC)."

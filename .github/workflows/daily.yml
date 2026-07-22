@@ -37,6 +37,7 @@ jobs:
       - name: Run study automation
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python3 main.py
 
       - name: Commit streak data
