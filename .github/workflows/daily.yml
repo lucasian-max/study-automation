@@ -22,11 +22,11 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-          npm ci --only=production
+      - name: Install Python deps
+        run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+
+      - name: Install Node deps
+        run: npm ci
 
       - name: Restore auth files
         run: |
