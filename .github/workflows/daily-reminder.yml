@@ -19,9 +19,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+        run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
 
       - name: Restore auth files
         run: |
@@ -30,4 +28,4 @@ jobs:
           fi
 
       - name: Send reminder
-        run: python3 send_reminder.py
+        run: python3 main.py --reminder

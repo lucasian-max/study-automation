@@ -2,6 +2,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
@@ -256,40 +257,6 @@ def summarize_notes(entries):
     return results
 
 
-def analyze_notes(entries):
-    if not entries:
-        return "", ""
-
-    notes_text = "\n".join(
-        f"- {e['category']} ({e['activity']}): {e['notes']}"
-        for e in entries if e.get("notes", "").strip()
-    )
-
-    # If notes are too short, skip analysis to avoid hallucination
-    words = notes_text.split()
-    if len(words) < 10:
-        return "", ""
-
-    prompt = f"From my notes, what went well and what to improve? One sentence each.\n\n{notes_text}"
-
-    print("\n--- Analysis prompt ---")
-    print(prompt)
-    print("---")
-
-    raw = _llm(prompt)
-    print("LLM response:", raw)
-
-    went_well = ""
-    improve = ""
-    for line in raw.split("\n"):
-        lower = line.lower()
-        if "went well" in lower and ":" in line:
-            went_well = line.split(":", 1)[1].strip()
-        elif "improve" in lower and ":" in line:
-            improve = line.split(":", 1)[1].strip()
-
-    return went_well, improve
-
 
 def load_streak_data():
     if STREAK_FILE.exists():
@@ -461,16 +428,9 @@ def _fval(val):
         return 0.0
 
 def _fdisp(val, suffix=""):
-    if val is None:
+    if val is None or str(val).strip() == "":
         return f"-{suffix}"
-    s = str(val).strip()
-    if not s:
-        return f"-{suffix}"
-    cleaned = s.lower().replace("hrs", "").replace("h", "").strip()
-    try:
-        v = float(cleaned)
-    except ValueError:
-        return f"-{suffix}"
+    v = _fval(val)
     return f"{v:.1f}{suffix}" if v == int(v) else f"{v}{suffix}"
 
 def format_whatsapp_message(entries, summaries, tone_line):
@@ -612,12 +572,56 @@ def send_whatsapp(message, config):
     retry_fn(_do, max_attempts=3, base_delay=10, label="WhatsApp Baileys")
 
 
+def _send_reminder(config, service):
+    try:
+        entries = retry_fn(lambda: get_todays_entries(service, config), max_attempts=3, base_delay=10, label="Sheets read")
+    except Exception as e:
+        print(f"Read failed: {e}")
+        return
+
+    today_str = date.today().strftime('%d %b %Y')
+
+    if entries:
+        total_h = sum(float(e["hours"]) if e["hours"] else 0 for e in entries)
+        lines = [
+            f"10pm check \u2014 {today_str}",
+            "",
+            f"Good, you logged {len(entries)} session(s) today ({total_h:.1f}h total). Keep going.",
+            "",
+        ]
+        for e in entries:
+            lines.append(f"  \u2022 {e['category']} \u2014 {e['activity']} ({e['hours']}h)")
+        lines.extend(["", "Summary goes to WhatsApp at 10:50pm."])
+        subject = f"\u2705 Study check-in \u2014 {len(entries)} session(s)"
+    else:
+        lines = [
+            f"10pm check \u2014 {today_str}",
+            "",
+            "WHERE THE HELL IS YOUR WORK? DO WORK.",
+            "",
+            "You have until 10:50pm to log your study entries. If nothing is logged by then, another alert will be sent and your streak will be broken.",
+            "",
+            "Stop procrastinating and get to it.",
+        ]
+        subject = f"\u26a0\ufe0f NO STUDY LOGGED \u2014 WHERE IS YOUR WORK"
+
+    try:
+        send_email(subject, "\n".join(lines), config)
+        print("Reminder email sent")
+    except Exception as e:
+        print(f"Email failed: {e}")
+
+
 def main():
     config = load_config()
     try:
         service = retry_fn(lambda: get_sheets_service(config), max_attempts=3, base_delay=10, label="Sheets auth")
     except Exception as e:
         print(f"Google Sheets auth failed after retries: {e}")
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--reminder":
+        _send_reminder(config, service)
         return
 
     try:

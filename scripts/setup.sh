@@ -20,15 +20,6 @@ else
   exit 1
 fi
 
-if [ -f whatsapp-session/state.json ]; then
-  WA_B64=$(base64 -i whatsapp-session/state.json 2>/dev/null || base64 < whatsapp-session/state.json)
-  echo "whatsapp-session/state.json encoded ✓"
-else
-  echo "Warning: whatsapp-session/state.json not found — WhatsApp will be skipped in CI."
-  echo "Run 'python3 main.py' locally and scan the QR code to generate it."
-  WA_B64=""
-fi
-
 echo ""
 echo "=== Step 3: Set GitHub secrets ==="
 echo "Running: gh secret set ..."
@@ -39,11 +30,6 @@ echo "OPENROUTER_API_KEY set ✓"
 
 echo "$TOKEN_B64" | gh secret set TOKEN_JSON --repo lucasian-max/study-automation
 echo "TOKEN_JSON set ✓"
-
-if [ -n "$WA_B64" ]; then
-  echo "$WA_B64" | gh secret set WHATSAPP_STATE --repo lucasian-max/study-automation
-  echo "WHATSAPP_STATE set ✓"
-fi
 
 echo ""
 echo "=== All secrets set! ==="
