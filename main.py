@@ -593,7 +593,7 @@ def _send_reminder(config, service):
         ]
         for e in entries:
             lines.append(f"  \u2022 {e['category']} \u2014 {e['activity']} ({e['hours']}h)")
-        lines.extend(["", "Summary goes to WhatsApp at 10:50pm."])
+        lines.extend(["", "Summary goes out at 11pm."])
         subject = f"\u2705 Study check-in \u2014 {len(entries)} session(s)"
     else:
         lines = [
@@ -601,7 +601,7 @@ def _send_reminder(config, service):
             "",
             "WHERE THE HELL IS YOUR WORK? DO WORK.",
             "",
-            "You have until 10:50pm to log your study entries. If nothing is logged by then, another alert will be sent and your streak will be broken.",
+            "You have until 11pm to log your study entries. If nothing is logged by then, another alert will be sent and your streak will be broken.",
             "",
             "Stop procrastinating and get to it.",
         ]

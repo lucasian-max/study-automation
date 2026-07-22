@@ -20,8 +20,8 @@
     "recipient": "mridul.vj2010@gmail.com"
   },
   "schedule": {
-    "check_time": "20:00",
-    "send_time": "21:00"
+    "check_time": "21:00",
+    "send_time": "22:00"
   },
   "date_format": "dd/mm/yyyy"
 }
