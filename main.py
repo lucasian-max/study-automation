@@ -557,106 +557,38 @@ def send_email_alert(config):
 
 
 def send_whatsapp(message, config):
-    import asyncio, sys, tarfile
-    from playwright.async_api import async_playwright
-    IN_CI = os.environ.get("CI") == "true"
+    import urllib.request, json as _json
 
-    async def _send():
-        wp = config["whatsapp"]
-        group_name = wp["group_name"]
-        profile_archive = Path(__file__).parent / "whatsapp-profile.tar.gz"
-        profile_dir = Path(__file__).parent / "whatsapp-profile"
+    token = os.environ.get("WHATSAPP_API_TOKEN")
+    phone_id = os.environ.get("WHATSAPP_PHONE_ID")
+    recipient = os.environ.get("WHATSAPP_RECIPIENT")
+    if not token or not phone_id or not recipient:
+        print("WHATSAPP_API_TOKEN, WHATSAPP_PHONE_ID, or WHATSAPP_RECIPIENT not set")
+        raise RuntimeError("NO_WHATSAPP_CREDS")
 
-        if not profile_dir.exists() and profile_archive.exists():
-            print("Extracting profile archive...")
-            import tarfile
-            with tarfile.open(profile_archive, "r:gz") as tar:
-                tar.extractall(path=Path(__file__).parent)
+    def _do():
+        url = f"https://graph.facebook.com/v21.0/{phone_id}/messages"
+        body = _json.dumps({
+            "messaging_product": "whatsapp",
+            "to": recipient,
+            "type": "text",
+            "text": {"body": message},
+        }).encode()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            }
+        )
+        resp = urllib.request.urlopen(req, timeout=30)
+        data = _json.loads(resp.read())
+        if data.get("messages"):
+            print("WhatsApp message sent via Cloud API")
+        else:
+            raise RuntimeError(f"API response: {data}")
 
-        if not profile_dir.exists():
-            if IN_CI:
-                print("WhatsApp profile not found in CI — skipping WhatsApp")
-                raise RuntimeError("NO_PROFILE_IN_CI")
-            print("WhatsApp profile not found. Run scripts/save_profile.py first.")
-            raise RuntimeError("NO_PROFILE")
-
-        async with async_playwright() as p:
-            if IN_CI:
-                context = await p.chromium.launch_persistent_context(
-                    str(profile_dir),
-                    headless=False,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                        "--disable-gpu",
-                        "--window-size=1280,720",
-                    ],
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                    viewport={"width": 1280, "height": 720},
-                )
-            elif sys.platform == "darwin":
-                context = await p.chromium.launch_persistent_context(
-                    str(profile_dir),
-                    headless=False, channel="chrome",
-                    args=["--disable-blink-features=AutomationControlled"],
-                )
-            else:
-                context = await p.chromium.launch_persistent_context(
-                    str(profile_dir), headless=False
-                )
-
-            page = context.pages[0]
-
-            # Stealth
-            await page.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-            """)
-
-            print("Opening WhatsApp Web...")
-            await page.goto("https://web.whatsapp.com", wait_until="load")
-
-            print("Waiting for chat to load...")
-            try:
-                await page.wait_for_selector('[aria-placeholder]', timeout=45000)
-            except Exception as e:
-                await page.screenshot(path=str(Path.cwd() / "wa_debug.png"), full_page=True)
-                raise
-            await page.wait_for_timeout(2000)
-
-            print(f"Searching for group: {group_name}")
-
-            search_box = page.get_by_role("textbox", name="Search")
-            await search_box.click()
-            await search_box.fill(group_name)
-            await page.wait_for_timeout(2000)
-
-            group_locator = page.locator(f"span[title='{group_name}']").first
-            await group_locator.wait_for(timeout=10000)
-            await group_locator.click()
-            await page.wait_for_timeout(1500)
-
-            msg_area = page.locator("footer div[contenteditable='true']").first
-            await msg_area.wait_for(timeout=10000)
-            await msg_area.click()
-            await page.keyboard.type(message, delay=10)
-            await page.wait_for_timeout(1000)
-
-            send_btn = page.locator("button span[data-icon='send']").first
-            await send_btn.wait_for(timeout=5000)
-            await send_btn.click()
-            await page.wait_for_timeout(3000)
-
-            print("Message sent!")
-            await context.close()
-
-    def _run():
-        asyncio.run(_send())
-
-    n = 2 if IN_CI else 5
-    retry_fn(_run, max_attempts=n, base_delay=30, label="WhatsApp")
+    retry_fn(_do, max_attempts=3, base_delay=10, label="WhatsApp API")
 
 
 def main():

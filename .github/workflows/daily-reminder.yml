@@ -20,22 +20,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb
           pip install --upgrade pip
           pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-          pip install playwright
-          playwright install chromium
 
       - name: Restore auth files
         run: |
           if [ -n "${{ secrets.TOKEN_JSON }}" ]; then
             echo "${{ secrets.TOKEN_JSON }}" | base64 -d > token.json
           fi
-          mkdir -p whatsapp-session
-          if [ -n "${{ secrets.WHATSAPP_STATE }}" ]; then
-            echo "${{ secrets.WHATSAPP_STATE }}" | base64 -d > whatsapp-session/state.json
-          fi
 
       - name: Send reminder
-        run: xvfb-run python3 send_reminder.py
+        run: python3 send_reminder.py
