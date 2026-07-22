@@ -2,8 +2,10 @@ token.json
 client_secret.json
 whatsapp-session/
 whatsapp-profile/
+baileys-auth/
 log.txt
 error.log
 __pycache__/
 *.pyc
 .DS_Store
+node_modules/

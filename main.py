@@ -557,38 +557,37 @@ def send_email_alert(config):
 
 
 def send_whatsapp(message, config):
-    import urllib.request, json as _json
+    import subprocess, tarfile
 
-    token = os.environ.get("WHATSAPP_API_TOKEN")
-    phone_id = os.environ.get("WHATSAPP_PHONE_ID")
-    recipient = os.environ.get("WHATSAPP_RECIPIENT")
-    if not token or not phone_id or not recipient:
-        print("WHATSAPP_API_TOKEN, WHATSAPP_PHONE_ID, or WHATSAPP_RECIPIENT not set")
-        raise RuntimeError("NO_WHATSAPP_CREDS")
+    script = Path(__file__).parent / "send-whatsapp.mjs"
+    auth_dir = Path(__file__).parent / "baileys-auth"
+    auth_archive = Path(__file__).parent / "baileys-auth.tar.gz"
+
+    if not auth_dir.exists() and auth_archive.exists():
+        print("Extracting WhatsApp auth...")
+        with tarfile.open(auth_archive, "r:gz") as tar:
+            tar.extractall(path=Path(__file__).parent)
+
+    if not auth_dir.exists():
+        raise RuntimeError("No baileys-auth directory")
 
     def _do():
-        url = f"https://graph.facebook.com/v21.0/{phone_id}/messages"
-        body = _json.dumps({
-            "messaging_product": "whatsapp",
-            "to": recipient,
-            "type": "text",
-            "text": {"body": message},
-        }).encode()
-        req = urllib.request.Request(
-            url, data=body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            }
+        result = subprocess.run(
+            ["node", str(script), message],
+            cwd=str(Path(__file__).parent),
+            input=message,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
-        resp = urllib.request.urlopen(req, timeout=30)
-        data = _json.loads(resp.read())
-        if data.get("messages"):
-            print("WhatsApp message sent via Cloud API")
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        if result.returncode == 0 and "OK" in stdout:
+            print("WhatsApp message sent")
         else:
-            raise RuntimeError(f"API response: {data}")
+            raise RuntimeError(f"node exited {result.returncode}: {stdout} {stderr}")
 
-    retry_fn(_do, max_attempts=3, base_delay=10, label="WhatsApp API")
+    retry_fn(_do, max_attempts=3, base_delay=10, label="WhatsApp Baileys")
 
 
 def main():

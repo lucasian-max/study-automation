@@ -18,10 +18,15 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+          npm ci --only=production
 
       - name: Restore auth files
         run: |
@@ -32,9 +37,6 @@ jobs:
       - name: Run study automation
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          WHATSAPP_API_TOKEN: ${{ secrets.WHATSAPP_API_TOKEN }}
-          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
-          WHATSAPP_RECIPIENT: ${{ secrets.WHATSAPP_RECIPIENT }}
         run: python3 main.py
 
       - name: Commit streak data
