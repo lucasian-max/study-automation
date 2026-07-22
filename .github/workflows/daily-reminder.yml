@@ -3,7 +3,7 @@ name: Study Reminder
 on:
   schedule:
     - cron: '0 12 * * 4-9'
-    - cron: '0 11 * * 10-3'
+    - cron: '0 11 * * 10,11,12,1,2,3'
   workflow_dispatch:
 
 permissions:
