@@ -44,8 +44,17 @@ def get_sheets_service(config):
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"Token refresh failed: {e}")
+                creds = None
+        if not creds or not creds.valid:
+            if not sys.stdin.isatty():
+                raise RuntimeError(
+                    "OAuth token expired and no browser available in headless mode. "
+                    "Run the script interactively to re-authenticate."
+                )
             flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(token_file, "w") as f:
@@ -164,6 +173,7 @@ def _llm(prompt, timeout=20):
         return data.get("response", "").strip()
     except Exception as e:
         print(f"Ollama error: {e}")
+        print("WARNING: All LLM backends unavailable — summaries will be empty")
         return ""
 
 
@@ -269,8 +279,10 @@ def load_streak_data():
 
 
 def save_streak_data(data):
-    with open(STREAK_FILE, "w") as f:
+    tmp = STREAK_FILE.with_suffix(".tmp")
+    with open(tmp, "w") as f:
         json.dump(data, f)
+    os.replace(tmp, STREAK_FILE)
 
 
 def update_streak(entries):
@@ -650,7 +662,11 @@ def main():
             wa_ok = True
         except Exception as e:
             print(f"WhatsApp failed after retries: {e}")
-            alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}"
+            err_str = str(e).lower()
+            hint = ""
+            if any(w in err_str for w in ["connection closed", "auth", "creds", "timeout"]):
+                hint = "\n\nHint: Re-authenticate locally with 'node setup-baileys.mjs', then re-deploy baileys-auth.tar.gz"
+            alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}{hint}"
             send_email(f"CRITICAL: WhatsApp failed \u2014 {date.today().strftime('%d %b %Y')}", alert, config)
             print("Critical alert email sent.")
 
