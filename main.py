@@ -195,7 +195,6 @@ def _restore_abbrevs(text, mapping):
 
 def _extract_actions(note):
     import re as _re
-    # Protect abbreviations with periods before splitting sentences
     protected, mapping = _protect_abbrevs(note)
     sents = _re.split(r'(?<=[.!?])\s+', protected)
     sents = [_restore_abbrevs(s, mapping) for s in sents]
@@ -235,21 +234,7 @@ def summarize_notes(entries):
 
         actions = _extract_actions(note)
         if actions is not None:
-            safe, ab_map = _protect_abbrevs(actions)
-            prompt = (
-                f"Say this back in natural casual English. Fix any grammar but keep it sounding like a person wrote it. "
-                f"Keep abbreviations and numbers. Return only the cleaned version:\n\n{safe}"
-            )
-            raw = _llm(prompt)
-            cleaned = raw.strip('"').strip("'").strip()
-            # Strip common prefixes the model adds
-            for p in ('Here is the revised sentence:', 'Here is the corrected sentence:', 'Corrected:', 'Revised:'):
-                if cleaned.lower().startswith(p.lower()):
-                    cleaned = cleaned[len(p):].strip()
-            if cleaned and len(cleaned) >= 5:
-                results.append(_restore_abbrevs(cleaned, ab_map))
-            else:
-                results.append(actions)
+            results.append(actions)
         else:
             safe_note, ab_map = _protect_abbrevs(note)
             prompt = (
@@ -329,33 +314,33 @@ def get_tone(entries, streak_data):
     streak = streak_data.get("streak", 0)
 
     if streak >= 7:
-        streak_line = f"Day {streak} of your study streak! 🔥"
+        streak_line = f"Day {streak} of your study streak!"
     elif streak >= 3:
-        streak_line = f"Day {streak} streak \u2014 keep it rolling! \U0001f4aa"
+        streak_line = f"Day {streak} streak \u2014 keep it rolling!"
     elif streak > 1:
         streak_line = f"Day {streak} in a row! Nice."
     elif streak == 1:
-        streak_line = "Back at it! Day 1 \U0001f504"
+        streak_line = "Back at it! Day 1"
     else:
         streak_line = ""
 
     if total_hours >= 3 and avg_focus >= 8:
-        tone = "Killed it today \U0001f525"
+        tone = "Killed it today"
     elif total_hours >= 2:
-        tone = "Solid session \U0001f4c8"
+        tone = "Solid session"
     elif total_hours >= 1:
-        tone = "Good effort \U0001f44f"
+        tone = "Good effort"
     else:
-        tone = "Every bit counts \U0001f422"
+        tone = "Every bit counts"
 
     hours_vs_yesterday = ""
     if streak_data["history"] and len(streak_data["history"]) >= 2:
         prev_hours = streak_data["history"][-2]["total_hours"]
         diff = round(total_hours - prev_hours, 1)
         if diff > 0:
-            hours_vs_yesterday = f"Up {diff}h from yesterday \u2191"
+            hours_vs_yesterday = f"Up {diff}h from yesterday"
         elif diff < 0:
-            hours_vs_yesterday = f"Down {abs(diff)}h from yesterday \u2193"
+            hours_vs_yesterday = f"Down {abs(diff)}h from yesterday"
 
     parts = [t for t in [streak_line, tone, hours_vs_yesterday] if t]
     return " | ".join(parts)
@@ -382,9 +367,9 @@ def compute_weekly_stats(streak_data):
             prev_week_hours = sum(d["total_hours"] for d in prev)
             diff = round(week_hours - prev_week_hours, 1)
             if diff > 0:
-                lines.append(f"  Up {diff}h from last week \U0001f4c8")
+                lines.append(f"  Up {diff}h from last week")
             elif diff < 0:
-                lines.append(f"  Down {abs(diff)}h from last week \U0001f4c9")
+                lines.append(f"  Down {abs(diff)}h from last week")
             else:
                 lines.append("  Same as last week")
 
@@ -445,9 +430,8 @@ def _fdisp(val, suffix=""):
     v = _fval(val)
     return f"{v:.1f}{suffix}" if v == int(v) else f"{v}{suffix}"
 
-def format_whatsapp_message(entries, summaries, tone_line):
+def format_whatsapp_message(entries, summaries):
     total_hours = sum(_fval(e["hours"]) for e in entries)
-    avg_focus = sum(_fval(e["focus"]) for e in entries) / max(len(entries), 1)
 
     cat_counts = {}
     for e in entries:
@@ -456,17 +440,15 @@ def format_whatsapp_message(entries, summaries, tone_line):
 
     cat_line = ", ".join(f"{c} ({n})" for c, n in cat_counts.items())
 
-    lines = [f"\U0001f4da *Study Summary \u2014 {date.today().strftime('%d %b %Y')}*"]
-    lines.append(f"_{len(entries)} sessions \u00b7 {total_hours:.1f}h total \u00b7 avg focus {avg_focus:.0f}/10_\n")
-    lines.append(f"{tone_line}\n")
+    lines = [f"*Study Summary \u2014 {date.today().strftime('%d %b %Y')}*"]
+    lines.append(f"_{len(entries)} sessions \u00b7 {total_hours:.1f}h total_\n")
 
     for i, e in enumerate(entries):
         s = summaries[i] if i < len(summaries) and summaries[i] else ""
         hours_disp = _fdisp(e["hours"], "h")
-        focus_disp = _fdisp(e["focus"])
         lines.append(
             f"*{i+1}. {e['category']} \u2014 {e['activity']}*"
-            f"\n   \u23f1 {hours_disp}  |  \U0001f3af {focus_disp}/10"
+            f"\n   {hours_disp}"
         )
         if s:
             lines.append(f"   _{s}_")
@@ -650,7 +632,7 @@ def main():
         streak_data = update_streak(entries)
         tone_line = get_tone(entries, streak_data)
 
-        whatsapp_msg = format_whatsapp_message(entries, summaries, tone_line)
+        whatsapp_msg = format_whatsapp_message(entries, summaries)
         print("\n--- WhatsApp Message ---")
         print(whatsapp_msg)
         print("---\n")
