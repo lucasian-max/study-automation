@@ -2,18 +2,7 @@ name: Daily Study Summary
 
 on:
   schedule:
-    - cron: '50 12 * * 4'
-    - cron: '50 12 * * 5'
-    - cron: '50 12 * * 6'
-    - cron: '50 12 * * 7'
-    - cron: '50 12 * * 8'
-    - cron: '50 12 * * 9'
-    - cron: '50 11 * * 10'
-    - cron: '50 11 * * 11'
-    - cron: '50 11 * * 12'
-    - cron: '50 11 * * 1'
-    - cron: '50 11 * * 2'
-    - cron: '50 11 * * 3'
+    - cron: '50 11 * * *'
   workflow_dispatch:
 
 permissions:
