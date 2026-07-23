@@ -237,8 +237,8 @@ def summarize_notes(entries):
         if actions is not None:
             safe, ab_map = _protect_abbrevs(actions)
             prompt = (
-                f"Fix the grammar of this sentence. Do not add, remove, or change any information. "
-                f"Keep abbreviations and numbers as-is. Return only the corrected sentence:\n\n{safe}"
+                f"Say this back in natural casual English. Fix any grammar but keep it sounding like a person wrote it. "
+                f"Keep abbreviations and numbers. Return only the cleaned version:\n\n{safe}"
             )
             raw = _llm(prompt)
             cleaned = raw.strip('"').strip("'").strip()
@@ -253,9 +253,8 @@ def summarize_notes(entries):
         else:
             safe_note, ab_map = _protect_abbrevs(note)
             prompt = (
-                f"Read this study note and answer: what was accomplished today? "
-                f"Be specific using only the note. 1 short first-person sentence. "
-                f"No feelings, no commentary, no emojis:\n\n{safe_note}"
+                f"In one short casual sentence, what happened today? "
+                f"Use only the note. First-person. No emojis or commentary:\n\n{safe_note}"
             )
             raw = _llm(prompt)
             cleaned = raw.strip('"').strip("'").strip()
