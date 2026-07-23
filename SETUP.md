@@ -40,6 +40,7 @@ From your sheet URL: `https://docs.google.com/spreadsheets/d/`**THIS_IS_THE_ID**
 Edit `config.json` and fill in:
 - `spreadsheet_id` — from step 2
 - `group_name` — exact name of your WhatsApp group
+- `recipient_jid` — your personal WhatsApp JID (e.g. `919876543210@s.whatsapp.net`). Messages are sent here instead of a group.
 - `email.sender` — your Gmail address
 - `email.app_password` — the 16-char app password
 
@@ -101,3 +102,13 @@ launchctl load ~/Library/LaunchAgents/com.study.automation.plist
 ```
 
 This runs the script every day at 8pm. If entries exist → WhatsApp. If not → email alert.
+
+## 7. Testing (dry-run)
+
+Preview the WhatsApp message without sending anything:
+
+```bash
+python3 main.py --dry-run
+```
+
+This reads today's entries from Google Sheets, generates summaries and the formatted message, and prints it to the terminal. Nothing is sent to WhatsApp or email.

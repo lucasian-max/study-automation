@@ -533,7 +533,7 @@ def send_email_alert(config):
     send_email(f"No study logged \u2014 {today_str}", alert, config)
 
 
-def send_whatsapp(message, config):
+def send_whatsapp(message, jid, config):
     import subprocess, tarfile
 
     script = Path(__file__).parent / "send-whatsapp.mjs"
@@ -550,7 +550,7 @@ def send_whatsapp(message, config):
 
     def _do():
         result = subprocess.run(
-            ["node", str(script), message],
+            ["node", str(script), jid, message],
             cwd=str(Path(__file__).parent),
             input=message,
             capture_output=True,
@@ -609,6 +609,9 @@ def _send_reminder(config, service):
 
 def main():
     config = load_config()
+
+    dry_run = "--dry-run" in sys.argv
+
     try:
         service = retry_fn(lambda: get_sheets_service(config), max_attempts=3, base_delay=10, label="Sheets auth")
     except Exception as e:
@@ -637,30 +640,34 @@ def main():
         print(whatsapp_msg)
         print("---\n")
 
-        wa_ok = False
-        try:
-            send_whatsapp(whatsapp_msg, config)
-            wa_ok = True
-        except Exception as e:
-            print(f"WhatsApp failed after retries: {e}")
-            err_str = str(e).lower()
-            hint = ""
-            if any(w in err_str for w in ["connection closed", "auth", "creds", "timeout"]):
-                hint = "\n\nHint: Re-authenticate locally with 'node setup-baileys.mjs', then re-deploy baileys-auth.tar.gz"
-            alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}{hint}"
-            send_email(f"CRITICAL: WhatsApp failed \u2014 {date.today().strftime('%d %b %Y')}", alert, config)
-            print("Critical alert email sent.")
+        if dry_run:
+            print("Dry run — message was printed above but NOT sent anywhere.")
+        else:
+            jid = config.get("whatsapp", {}).get("recipient_jid", "")
+            wa_ok = False
+            try:
+                send_whatsapp(whatsapp_msg, jid, config)
+                wa_ok = True
+            except Exception as e:
+                print(f"WhatsApp failed after retries: {e}")
+                err_str = str(e).lower()
+                hint = ""
+                if any(w in err_str for w in ["connection closed", "auth", "creds", "timeout"]):
+                    hint = "\n\nHint: Re-authenticate locally with 'node setup-baileys.mjs', then re-deploy baileys-auth.tar.gz"
+                alert = f"WhatsApp message failed to send.\n\nOriginal message:\n\n{whatsapp_msg}\n\nError: {e}{hint}"
+                send_email(f"CRITICAL: WhatsApp failed \u2014 {date.today().strftime('%d %b %Y')}", alert, config)
+                print("Critical alert email sent.")
 
-        email_body = format_email_body(entries, summaries, tone_line, streak_data)
-        print("\n--- Email Body ---")
-        print(email_body)
-        print("---\n")
+            email_body = format_email_body(entries, summaries, tone_line, streak_data)
+            print("\n--- Email Body ---")
+            print(email_body)
+            print("---\n")
 
-        today_str = date.today().strftime('%d %b %Y')
-        try:
-            send_email(f"Study Report \u2014 {today_str}", email_body, config)
-        except Exception as e:
-            print(f"Email failed: {e}")
+            today_str = date.today().strftime('%d %b %Y')
+            try:
+                send_email(f"Study Report \u2014 {today_str}", email_body, config)
+            except Exception as e:
+                print(f"Email failed: {e}")
     else:
         print("No entries found for today. Sending alert email...")
         try:
